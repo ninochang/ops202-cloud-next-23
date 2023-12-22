@@ -1,0 +1,60 @@
+export PROJECT_ID=swag-nino-chang
+# sets the current project for gcloud
+gcloud config set project $PROJECT_ID
+# Enables various APIs you'll need
+gcloud services enable \
+  container.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  clouddeploy.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  secretmanager.googleapis.com \
+  containeranalysis.googleapis.com \
+  containerscanning.googleapis.com \
+  binaryauthorization.googleapis.com
+
+
+gcloud artifacts repositories create pop-stats \
+--location=asia-east1 \
+--repository-format=docker \
+--project=$PROJECT_ID
+
+
+
+export PREFIX=bug
+export TAG=$PREFIX-$(date +%s)
+export IMAGE="asia-east1-docker.pkg.dev/$PROJECT_ID/pop-stats/pop-stats:$TAG"
+docker build app/ -t $IMAGE -f app/Dockerfile
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+docker push $IMAGE
+
+
+export RELEASE=rel-$(date +%s)
+gcloud deploy releases create ${RELEASE} \
+  --delivery-pipeline pop-stats-pipeline \
+  --region us-central1 \
+  --images pop-stats=$IMAGE
+
+gcloud deploy apply --file clouddeploy-1.yaml --region=us-central1 --project=$PROJECT_ID
+
+gcloud deploy apply --file clouddeploy-2.yaml --region=us-central1 --project=$PROJECT_ID
+
+gcloud deploy apply --file clouddeploy-3.yaml --region=us-central1 --project=$PROJECT_ID
+
+
+gcloud services enable containerscanning.googleapis.com --project=$PROJECT_ID
+
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member=serviceAccount:$(gcloud projects describe $PROJECT_ID \
+    --format="value(projectNumber)")-compute@developer.gserviceaccount.com \
+    --role="roles/artifactregistry.reader"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member=serviceAccount:$(gcloud projects describe $PROJECT_ID \
+    --format="value(projectNumber)")-compute@developer.gserviceaccount.com \
+    --role="roles/container.developer"
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member=serviceAccount:$(gcloud projects describe $PROJECT_ID \
+    --format="value(projectNumber)")-compute@developer.gserviceaccount.com \
+    --role="roles/clouddeploy.jobRunner"

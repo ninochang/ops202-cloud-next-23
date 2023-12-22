@@ -29,7 +29,7 @@ steps:
         --format 'value(image_summary.digest)' > digest
       gcloud deploy releases create rel-${SHORT_SHA} \
         --delivery-pipeline pop-stats-pipeline \
-        --region asia-east1 \
+        --region us-central1 \
         --annotations commitId=${REVISION_ID} \
         --images pop-stats=asia-east1-docker.pkg.dev/$PROJECT_ID/pop-stats/pop-stats:${COMMIT_SHA}@$(cat digest)
       while :
